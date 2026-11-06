@@ -94,6 +94,16 @@ async function build(ctx: Context, accounts: Account[], opts?: { skipNodes?: boo
             }
         }
     } catch { /* missing/invalid key or unreachable — omit */ }
+    // OpenCode Go / Console: flat-rate open models, used here for cheap work.
+    if (await configured("opencode:deepseek-v4.1-flash")) out.opencode = [
+        "opencode:deepseek-v4.1-flash",
+        "opencode:deepseek-v4-pro",
+        "opencode:glm-5.3-flash",
+        "opencode:glm-5.3",
+        "opencode:kimi-k3",
+        "opencode:minimax-m3",
+        "opencode:qwen3.8-max",
+    ];
     if (await configured("openrouter:anthropic/claude-sonnet-4.6")) out.openrouter = [
         "openrouter:anthropic/claude-sonnet-4.6",
         "openrouter:google/gemini-2.5-pro",
