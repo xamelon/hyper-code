@@ -12,7 +12,7 @@
  * @param opts.now Current time in ms, for testing.
  */
 export default function (ctx: Context, _session: Session | null, opts: {
-    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean }>;
+    /** Rows produced by llm.listAccounts. */ accounts: Array<{ provider: string; account: string; label: string; model: string; source: "file" | "oauth" | "keychain" | "node" | "key"; available: boolean; usedPercent: number | null; planType: string | null; resetsAt: number | null; resetCredits?: types.llm.UsageSnapshot["resetCredits"]; parkedAgents: number; needsReconnect?: boolean }>;
     /** Login flows currently pending or recently completed. */ logins?: Array<{ provider: string; account: string; status: "pending" | "connected" | "failed"; verificationUri: string | null; userCode: string | null; error: string | null }>;
     /** Current timestamp in ms. */ now?: number;
 }): string {
@@ -52,10 +52,11 @@ export default function (ctx: Context, _session: Session | null, opts: {
         { id: "claude", title: "Claude", icon: "claude-code:claude", accounts: opts.accounts.filter(a => a.provider === "claude-code" || a.provider === "anthropic-oauth"), add: addButton(ctx, "claude-code", "Add Claude account") },
         { id: "grok", title: "Grok", icon: "xai:grok", accounts: opts.accounts.filter(a => a.provider === "xai"), add: addButton(ctx, "xai", "Add Grok account") },
         { id: "kimi", title: "Kimi Coding", icon: "kimi-coding:k3", accounts: opts.accounts.filter(a => a.provider === "kimi-coding"), add: ctx.fns.w.button({ label: "+ Add account", size: "sm", marks: { action: "add-kimi" }, title: "Kimi multi-login is not wired yet", disabled: true }) },
+        { id: "opencode", title: "OpenCode Go", icon: "opencode:", accounts: opts.accounts.filter(a => a.provider === "opencode"), add: ctx.fns.w.button({ label: opts.accounts.some(a => a.provider === "opencode") ? "Manage key" : "Add key", icon: "key", tone: "neutral", size: "sm", action: { href: "/settings" }, marks: { action: "opencode-key" } }), hint: "Add the subscription's API key in Settings." },
     ];
     const providerSections = providers.map(p => {
         const heading = ctx.fns.w.heading({ title: p.title, lead: ctx.fns.ui.modelLogo?.({ model: p.icon, bare: true }) ?? "", meta: `${p.accounts.length} connected account${p.accounts.length === 1 ? "" : "s"}`, actions: p.add });
-        const body = p.accounts.length ? p.accounts.map(row).join("") : ctx.fns.w.empty({ title: `No ${p.title} accounts`, icon: "tray", hint: "Use Add account to connect one." });
+        const body = p.accounts.length ? p.accounts.map(row).join("") : ctx.fns.w.empty({ title: `No ${p.title} accounts`, icon: "tray", hint: (p as { hint?: string }).hint ?? "Use Add account to connect one." });
         return `<section data-provider="${p.id}">${heading}${ctx.fns.w.card({ body, flush: true })}</section>`;
     }).join("");
 
@@ -75,7 +76,7 @@ export default function (ctx: Context, _session: Session | null, opts: {
 function addButton(ctx: Context, provider: "claude-code" | "codex" | "xai", title: string): string {
     return ctx.fns.w.button({ label: title, icon: "plus", tone: "neutral", size: "sm", action: { popup: { method: "llms.loginPopupFor", params: { provider } } }, marks: { action: "open-popup" } });
 }
-function storageLabel(source:string){return source==="node"?{text:"Hyper node",title:"Relayed through another Hyper instance; only your client token is stored here"}:source==="oauth"?{text:"Encrypted by Hyper",title:"OAuth credential encrypted and stored by Hyper"}:source==="keychain"?{text:"Keychain",title:"Credential stored by the official CLI in macOS Keychain"}:{text:"CLI storage",title:"Credential stored in an isolated official CLI directory"};}
+function storageLabel(source:string){return source==="key"?{text:"API key",title:"Subscription API key from Settings"}:source==="node"?{text:"Hyper node",title:"Relayed through another Hyper instance; only your client token is stored here"}:source==="oauth"?{text:"Encrypted by Hyper",title:"OAuth credential encrypted and stored by Hyper"}:source==="keychain"?{text:"Keychain",title:"Credential stored by the official CLI in macOS Keychain"}:{text:"CLI storage",title:"Credential stored in an isolated official CLI directory"};}
 function providerName(p:string){return p==="hyper"?"Hyper node":p==="anthropic-oauth"?"Claude":p==="claude-code"?"Claude Code":p==="kimi-coding"?"Kimi Coding":p==="xai"?"Grok":p==="codex"?"Codex":p;}
 function planName(provider:string, plan:string){const p=String(plan).toLowerCase();if(provider==="codex"&&p==="prolite")return "ChatGPT Go";return p==="pro"?"Pro":p==="max"?"Max":p==="team"?"Team":p==="enterprise"?"Enterprise":plan;}
 function humanDelay(ms:number){const m=Math.floor(Math.max(0,ms)/60000),h=Math.floor(m/60),d=Math.floor(h/24);return d?`${d}d ${h%24}h`:h?`${h}h ${m%60}m`:`${m}m`;}

@@ -29,7 +29,7 @@ export default async function (
     account: string;
     label: string;
     model: string;
-    source: "file" | "oauth" | "keychain" | "node";
+    source: "file" | "oauth" | "keychain" | "node" | "key";
     available: boolean;
     usedPercent: number | null;
     resetsAt: number | null;
@@ -102,6 +102,19 @@ export default async function (
         }
     }
 
+    // OpenCode Go is a subscription reached with one API key, so it has exactly
+    // one account, and that account exists when the key does.
+    if (!filter || filter === "opencode") {
+        let key: string | null = null;
+        try { key = (await ctx.fns.llm.resolveEndpoint({ model: "opencode:glm-5.3" })).apiKey; } catch { /* no usable key */ }
+        if (key) {
+            const item = entry("opencode", "default", "key", byKey, reconnectKeys);
+            item.label = "OpenCode Go";
+            item.planType = "Go";
+            out.push(item);
+        }
+    }
+
     // Hyper nodes (docs/hyper-node.md): one row per node; quota is the node's
     // most-used provider we are allowed to use, from its cached usage snapshot.
     if (!filter || filter === "hyper") {
@@ -122,7 +135,7 @@ export default async function (
     return out;
 }
 
-function entry(provider: string, account: string, source: "file" | "oauth" | "keychain" | "node", byKey: Map<string, any>, reconnectKeys: Set<string>) {
+function entry(provider: string, account: string, source: "file" | "oauth" | "keychain" | "node" | "key", byKey: Map<string, any>, reconnectKeys: Set<string>) {
     const known = byKey.get(`${provider}:${account}`);
     const usedPercent = known?.usedPercent ?? null;
     const needsReconnect = reconnectKeys.has(`${provider}:${account}`);
