@@ -82,9 +82,12 @@ export default async function (
             text += delta.content;
             opts.onEvent?.({ type: "text_delta", delta: delta.content });
         }
-        if (typeof delta.reasoning_content === "string" && delta.reasoning_content.length > 0) {
-            thinking += delta.reasoning_content;
-            opts.onEvent?.({ type: "thinking_delta", delta: delta.reasoning_content });
+        // DeepSeek/GLM/Qwen send reasoning_content; Kimi and OpenRouter-style
+        // gateways send reasoning.
+        const reasoningDelta = delta.reasoning_content ?? delta.reasoning;
+        if (typeof reasoningDelta === "string" && reasoningDelta.length > 0) {
+            thinking += reasoningDelta;
+            opts.onEvent?.({ type: "thinking_delta", delta: reasoningDelta });
         }
         for (const tc of delta.tool_calls ?? []) {
             const i = Number(tc.index ?? 0);
