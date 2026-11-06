@@ -14,7 +14,7 @@ export default async function (ctx: Context, _session: Session | null, _opts: {
     const authorizationUrl = pending?.authorizationUrl ? String(pending.authorizationUrl) : null;
     const connected = [
         status.codex.loggedIn, status.kimiCoding.loggedIn, oauth.connected,
-        status.openai.set, status.anthropic.set, status.openrouter.set,
+        status.openai.set, status.anthropic.set, status.openrouter.set, status.opencode.set,
     ].filter(Boolean).length;
 
     const badge = (on: boolean, label?: string) => on
@@ -79,7 +79,7 @@ ${addAccountForm}` : `
 <div class="mx-auto max-w-5xl space-y-7 px-6 py-6">
 ${ctx.fns.llms.accountsCard({ accounts, logins })}
 ${await ctx.fns.node.card({})}
-<section><div class="mb-3"><h2 class="text-xs font-semibold uppercase tracking-wider text-subtle">API providers</h2><p class="mt-1 text-xs text-faint">Pay-per-token keys are managed separately from subscription accounts.</p></div><div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">${staticCard({ icon: "ph-sparkle", name: "Anthropic API", description: "Claude models billed through an Anthropic API key.", on: status.anthropic.set, methods: [status.anthropic.set ? "Manage key in Settings" : "Add key in Settings"] })}${staticCard({ icon: "ph-circles-three-plus", name: "OpenAI", description: "OpenAI platform models and billing.", on: status.openai.set, methods: [status.openai.set ? "Manage key in Settings" : "Add key in Settings"] })}${staticCard({ icon: "ph-git-fork", name: "OpenRouter", description: "Multiple model vendors through one API.", on: status.openrouter.set, methods: [status.openrouter.set ? "Manage key in Settings" : "Add key in Settings"] })}</div></section>
+<section><div class="mb-3"><h2 class="text-xs font-semibold uppercase tracking-wider text-subtle">API providers</h2><p class="mt-1 text-xs text-faint">API keys are managed separately from subscription accounts.</p></div><div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">${staticCard({ icon: "ph-sparkle", name: "Anthropic API", description: "Claude models billed through an Anthropic API key.", on: status.anthropic.set, methods: [status.anthropic.set ? "Manage key in Settings" : "Add key in Settings"] })}${staticCard({ icon: "ph-circles-three-plus", name: "OpenAI", description: "OpenAI platform models and billing.", on: status.openai.set, methods: [status.openai.set ? "Manage key in Settings" : "Add key in Settings"] })}${staticCard({ icon: "ph-git-fork", name: "OpenRouter", description: "Multiple model vendors through one API.", on: status.openrouter.set, methods: [status.openrouter.set ? "Manage key in Settings" : "Add key in Settings"] })}${staticCard({ icon: "ph-terminal-window", name: "OpenCode Go", description: "Flat-rate open models through the OpenCode gateway.", on: status.opencode.set, methods: [status.opencode.set ? "Manage key in Settings" : "Add key in Settings"] })}</div></section>
 </div></div>`;
     return { title: "LLMs", main };
 }

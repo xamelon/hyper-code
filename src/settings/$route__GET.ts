@@ -50,6 +50,7 @@ export default async function (ctx: Context, _session: Session | null, _opts: {
     ${envRow("Kimi (Moonshot)", "KIMI_API_KEY", s.kimi.set, "kimi:kimi-k2-…")}
     ${envRow("Groq", "GROQ_API_KEY", s.groq.set, "groq:llama-…")}
     ${envRow("OpenRouter", "OPENROUTER_API_KEY", s.openrouter.set, "openrouter:…")}
+    ${envRow("OpenCode Go", "OPENCODE_API_KEY", s.opencode.set, "opencode:…")}
   </section>
 
   <section>

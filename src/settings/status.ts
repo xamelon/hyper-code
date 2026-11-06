@@ -10,6 +10,7 @@ export default async function (ctx: Context, _session: Session | null, _opts?: {
     kimi: { set: boolean };
     groq: { set: boolean };
     openrouter: { set: boolean };
+    opencode: { set: boolean };
     kimiCoding: { loggedIn: boolean; expSec: number | null; loginPending: boolean };
     codex: { loggedIn: boolean; email: string | null; expSec: number | null; loginPending: boolean };
 }> {
@@ -47,6 +48,7 @@ export default async function (ctx: Context, _session: Session | null, _opts?: {
         kimi: { set: !!env.KIMI_API_KEY },
         groq: { set: !!env.GROQ_API_KEY },
         openrouter: { set: !!env.OPENROUTER_API_KEY },
+        opencode: { set: !!env.OPENCODE_API_KEY },
         kimiCoding: { ...kc, loginPending: kimiPending },
         codex: { ...cx, loginPending: codexPending },
     };

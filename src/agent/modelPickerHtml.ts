@@ -53,6 +53,7 @@ export default async function (
         codex: "Codex",
         openai: "OpenAI API",
         openrouter: "OpenRouter",
+        opencode: "OpenCode Go",
         "kimi-coding": "Kimi Coding",
         kimi: "Kimi API",
         cursor: "Cursor",
@@ -148,7 +149,7 @@ export default async function (
 type Account = { provider: string; account: string; available: boolean; needsReconnect: boolean; usedPercent: number | null; planType: string | null; label?: string; upstream?: string; models?: string[] };
 type Entry = { provider: string; models: string[]; accounts: Account[]; node?: string };
 
-const UPSTREAM_LABELS: Record<string, string> = { "claude-code": "Claude Code", "anthropic-oauth": "Claude managed", anthropic: "Anthropic API", codex: "Codex", openai: "OpenAI API", openrouter: "OpenRouter", "kimi-coding": "Kimi Coding", kimi: "Kimi API", cursor: "Cursor", groq: "Groq", xai: "xAI" };
+const UPSTREAM_LABELS: Record<string, string> = { "claude-code": "Claude Code", "anthropic-oauth": "Claude managed", anthropic: "Anthropic API", codex: "Codex", openai: "OpenAI API", openrouter: "OpenRouter", opencode: "OpenCode Go", "kimi-coding": "Kimi Coding", kimi: "Kimi API", cursor: "Cursor", groq: "Groq", xai: "xAI" };
 
 // One entry per Hyper node (docs/hyper-node.md): the node is shown like a
 // provider with a proxy mark, its "accounts" are the host's own providers
