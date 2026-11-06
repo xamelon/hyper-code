@@ -46,6 +46,12 @@ export default async function (
 
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (ep.apiKey) headers["authorization"] = `Bearer ${ep.apiKey}`;
+    // OpenCode's gateway routes and caches per conversation and wants a named
+    // client rather than a generic HTTP library; see its Go documentation.
+    if (ep.provider === "opencode") {
+        headers["user-agent"] = "hyper-agent/1.0";
+        headers["x-opencode-session"] = await ctx.fns.agent.cacheRoot({ agent });
+    }
 
     const res = await ctx.fns.llm.connectFetch({ url: ep.url, init: {
         method: "POST",
