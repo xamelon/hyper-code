@@ -166,6 +166,8 @@ const CLAUDE_MODELS = [
  * accounts visible so they can be picked and reconnected.
  */
 const SUBSCRIPTIONS: Record<string, (ctx: Context, a: Account) => Promise<string[]>> = {
+    // OpenCode Go: flat-rate open models, used here for cheap work.
+    opencode: async () => ["deepseek-v4.1-flash", "deepseek-v4-pro", "glm-5.3-flash", "glm-5.3", "kimi-k3", "minimax-m3", "qwen3.8-max"],
     codex: async (ctx, a) => {
         if (a.needsReconnect) return [];
         const tok = await ctx.fns.llm.refreshCodex({ account: a.account });

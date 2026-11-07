@@ -27,6 +27,14 @@ describe("agent.modelPicker", () => {
 
     });
 
+    test("names the OpenCode Go provider and keeps its route IDs", async () => {
+        const ctx: any = await mkTestCtx();
+        ctx.fns.llm.listModels = async () => ({ opencode: ["opencode:glm-5.3"] });
+        const html = await ctx.fns.agent.modelPickerHtml({ current: "opencode:glm-5.3", mode: "form" });
+        expect(html).toContain("OpenCode Go");
+        expect(html).toContain('name="model" value="opencode:glm-5.3"');
+    });
+
     test("expands named credential accounts into concrete model routes", async () => {
         const ctx: any = await mkTestCtx();
         const agent = await ctx.fns.agent.start({ model: "codex:gpt-test" });

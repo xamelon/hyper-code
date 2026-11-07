@@ -153,6 +153,19 @@ const PROVIDERS: Record<string, ProviderConfig> = {
         resolveBaseUrl: () => "https://openrouter.ai/api/v1",
         resolveApiKey: declaredSecret('openrouterApiKey'),
     },
+    opencode: {
+        // OpenCode Go subscription gateway. One API key, OpenAI-compatible
+        // route; /inference/go/v1 bills the flat-rate Go plan, while
+        // /inference/v1 is pay-as-you-go Zen (402 without funds) and
+        // /inference/openai/v1 does not exist. An ordinary 429 is throttling;
+        // only the gateway's named limit errors park (llm.classifyError).
+        // streamOpenAI adds the user-agent and x-opencode-session headers the
+        // gateway asks coding agents to send.
+        api: "openai",
+        kind: "subscription",
+        resolveBaseUrl: () => "https://opencode.ai/inference/go/v1",
+        resolveApiKey: declaredSecret('opencodeApiKey'),
+    },
     mock: {
         api: "mock",
         kind: "local",

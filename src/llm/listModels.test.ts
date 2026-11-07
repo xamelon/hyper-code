@@ -107,7 +107,7 @@ describe("llm.listModels", () => {
                 kimiCodingModels: async ({ account }: { account: string }) => [`kimi-coding${account === "default" ? "" : "/" + account}:k`],
             }), null);
             const resolveEndpoint = (await import("./resolveEndpoint")).default;
-            const rctx = { env: {}, fns: { llm: { refreshKimiCode: async () => null, accountCredentialPath: () => ({ file: null }) }, settings: { getString: async () => "" } } } as unknown as Context;
+            const rctx = { env: {}, fns: { llm: { refreshKimiCode: async () => null, accountCredentialPath: () => ({ file: null }) }, settings: { getString: async () => "" }, secrets: { resolveSetting: async () => null } } } as unknown as Context;
             for (const provider of providers) {
                 const ids = groups[provider] ?? [];
                 expect({ provider, routes: ids.length > 0 }).toEqual({ provider, routes: true });

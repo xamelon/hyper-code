@@ -46,6 +46,12 @@ export default async function (
 
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (ep.apiKey) headers["authorization"] = `Bearer ${ep.apiKey}`;
+    // OpenCode's gateway routes and caches per conversation and wants a named
+    // client rather than a generic HTTP library; see its Go documentation.
+    if (ep.provider === "opencode") {
+        headers["user-agent"] = "hyper-agent/1.0";
+        headers["x-opencode-session"] = await ctx.fns.agent.cacheRoot({ agent });
+    }
 
     const res = await ctx.fns.llm.connectFetch({ url: ep.url, init: {
         method: "POST",
@@ -53,7 +59,16 @@ export default async function (
         body: JSON.stringify(body),
         signal: opts.signal,
     } });
-    if (!res.ok) throw new Error(`${ep.provider} ${res.status}: ${await res.text()}`);
+    if (!res.ok) {
+        const raw = await res.text();
+        const error: any = new Error(`${ep.provider} ${res.status}: ${raw}`);
+        // A spent subscription must reach the worker as error.failure to park; anything else stays a plain error.
+        if (ep.kind === "subscription") {
+            const info = ctx.fns.llm.classifyError({ provider: ep.provider, account: ep.account, kind: ep.kind, status: res.status, body: raw, headers: res.headers });
+            if (info.kind === "usage_limit") { error.message = info.message; error.failure = info; }
+        }
+        throw error;
+    }
     if (!res.body) throw new Error("empty response body");
 
     let text = "";
@@ -76,9 +91,12 @@ export default async function (
             text += delta.content;
             opts.onEvent?.({ type: "text_delta", delta: delta.content });
         }
-        if (typeof delta.reasoning_content === "string" && delta.reasoning_content.length > 0) {
-            thinking += delta.reasoning_content;
-            opts.onEvent?.({ type: "thinking_delta", delta: delta.reasoning_content });
+        // DeepSeek/GLM/Qwen send reasoning_content; Kimi and OpenRouter-style
+        // gateways send reasoning.
+        const reasoningDelta = delta.reasoning_content ?? delta.reasoning;
+        if (typeof reasoningDelta === "string" && reasoningDelta.length > 0) {
+            thinking += reasoningDelta;
+            opts.onEvent?.({ type: "thinking_delta", delta: reasoningDelta });
         }
         for (const tc of delta.tool_calls ?? []) {
             const i = Number(tc.index ?? 0);

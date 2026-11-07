@@ -193,8 +193,14 @@ async function openAI(endpoint: any, opts: any) {
     if (endpoint.provider === "groq" && /^openai\/gpt-oss-(20b|120b)$/.test(endpoint.modelId) && opts.groqReasoningEffort) body.reasoning_effort = opts.groqReasoningEffort;
     if (endpoint.provider === "openrouter" && opts.openrouterReasoningEffort) body.reasoning = { effort: opts.openrouterReasoningEffort, exclude: true };
     if (opts.response_format != null) body.response_format = opts.response_format;
-    let response = await fetch(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) });
-    response = await retryWithoutUnsupportedTemperature(response, body, () => fetch(endpoint.url, { signal: opts.signal, method: "POST", headers: { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) }, body: JSON.stringify(body) }));
+    const headers: Record<string, string> = { "content-type": "application/json", ...(endpoint.apiKey ? { authorization: `Bearer ${endpoint.apiKey}` } : {}) };
+    // The OpenCode Go gateway rejects requests without a session id (400 MissingSessionID).
+    if (endpoint.provider === "opencode") {
+        headers["user-agent"] = "hyper-agent/1.0";
+        headers["x-opencode-session"] = opts.sessionId || Bun.randomUUIDv7();
+    }
+    let response = await fetch(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) });
+    response = await retryWithoutUnsupportedTemperature(response, body, () => fetch(endpoint.url, { signal: opts.signal, method: "POST", headers, body: JSON.stringify(body) }));
     if (!response.ok) throw new Error(`${endpoint.provider} ${response.status}: ${await response.text()}`);
     const raw: any = await response.json();
     const choice = raw?.choices?.[0] ?? {};
