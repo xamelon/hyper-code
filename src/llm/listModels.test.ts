@@ -51,20 +51,40 @@ describe("llm.listModels", () => {
 
     describe("Grok catalogue", () => {
         const known = ["grok-4.7", "grok-4.6", "grok-4.5", "grok-4.3"];
-        const withReply = async (reply: (auth: string) => Response, accounts = [account("xai", "work")]) => {
+        const withReply = async (reply: (auth: string) => Response, accounts = [account("xai", "work")], windows: () => Response = () => Response.json({ data: [] })) => {
             const realFetch = globalThis.fetch;
             const seen: string[] = [];
             globalThis.fetch = (async (input: any, init?: any) => {
-                if (String(input?.url ?? input) !== "https://api.x.ai/v1/language-models") return realFetch(input, init);
+                const url = String(input?.url ?? input);
+                if (url === "https://api.x.ai/v1/models") return windows();
+                if (url !== "https://api.x.ai/v1/language-models") return realFetch(input, init);
                 const auth = String(new Headers(init?.headers).get("authorization"));
                 seen.push(auth);
                 return reply(auth);
             }) as typeof fetch;
             try {
-                const groups = await listModels(offline(accounts, { getXaiOAuthToken: async ({ account }: { account: string }) => `${account}-token` }), null);
-                return { seen, ids: groups.xai };
+                const ctx: any = offline(accounts, { getXaiOAuthToken: async ({ account }: { account: string }) => `${account}-token` });
+                ctx.state = {};
+                const groups = await listModels(ctx, null);
+                return { seen, ids: groups.xai, state: ctx.state };
             } finally { globalThis.fetch = realFetch; }
         };
+
+        test("remembers each model's context window from /v1/models", async () => {
+            const { state, ids } = await withReply(
+                () => Response.json({ models: [{ id: "grok-4.7", created: 1 }] }),
+                undefined,
+                () => Response.json({ data: [{ id: "grok-4.7", context_length: 500_000 }, { id: "grok-imagine-video" }] }),
+            );
+            expect(ids).toEqual(["xai/work:grok-4.7"]);
+            expect(state.llm.xaiContextLengths).toEqual({ "grok-4.7": 500_000 });
+        });
+
+        test("a failed window lookup does not cost the model list", async () => {
+            const { ids, state } = await withReply(() => Response.json({ models: [{ id: "grok-4.7", created: 1 }] }), undefined, () => new Response("no", { status: 500 }));
+            expect(ids).toEqual(["xai/work:grok-4.7"]);
+            expect(state.llm).toBeUndefined();
+        });
 
         test("comes from xAI with the account's own token, newest first, without multi-agent models", async () => {
             const { seen, ids } = await withReply(() => Response.json({ models: [

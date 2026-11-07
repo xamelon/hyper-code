@@ -108,6 +108,11 @@ describe("llm.classifyError", () => {
         expect(info.kind).toBe("overflow");
     });
 
+    test("context overflow in xAI's and the OpenAI-compatible wording", () => {
+        expect(call({ provider: "xai", kind: "subscription", status: 400, body: "This model's maximum prompt length is 131072 but the request contains 537812 tokens" }).kind).toBe("overflow");
+        expect(call({ provider: "openrouter", kind: "api", status: 400, body: "This model's maximum context length is 128000 tokens" }).kind).toBe("overflow");
+    });
+
     test("5xx and dropped connections are transient", () => {
         expect(call({ provider: "codex", kind: "subscription", status: 503, body: "" }).kind).toBe("transient");
         expect(call({ provider: "codex", kind: "subscription", status: 0, body: "Connection closed" }).kind).toBe("transient");

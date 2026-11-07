@@ -194,10 +194,13 @@ const SUBSCRIPTIONS: Record<string, (ctx: Context, a: Account) => Promise<string
         if (a.needsReconnect) return GROK_MODELS;
         try {
             const tok = await ctx.fns.llm.getXaiOAuthToken({ account: a.account });
-            const r = await fetch("https://api.x.ai/v1/language-models", {
-                headers: { "authorization": `Bearer ${tok}` },
-                signal: AbortSignal.timeout(3000),
-            });
+            const [r] = await Promise.all([
+                fetch("https://api.x.ai/v1/language-models", {
+                    headers: { "authorization": `Bearer ${tok}` },
+                    signal: AbortSignal.timeout(3000),
+                }),
+                rememberXaiContextLengths(ctx, tok),
+            ]);
             if (!r.ok) return GROK_MODELS;
             const j: any = await r.json();
             const ids = (j.models ?? [])
@@ -208,3 +211,19 @@ const SUBSCRIPTIONS: Record<string, (ctx: Context, a: Account) => Promise<string
         } catch { return GROK_MODELS; }
     },
 };
+
+// Only /v1/models states each model's window. compaction.contextWindow reads it from here and has its own
+// fallback, so a failure must not cost the model list.
+async function rememberXaiContextLengths(ctx: Context, tok: string | null): Promise<void> {
+    try {
+        const r = await fetch("https://api.x.ai/v1/models", {
+            headers: { "authorization": `Bearer ${tok}` },
+            signal: AbortSignal.timeout(3000),
+        });
+        if (!r.ok) return;
+        const j: any = await r.json();
+        const llm = ((ctx.state as any).llm ??= {});
+        llm.xaiContextLengths ??= {};
+        for (const m of j.data ?? []) if (Number(m.context_length) > 0) llm.xaiContextLengths[String(m.id).toLowerCase()] = Number(m.context_length);
+    } catch { /* the fallback window stands */ }
+}
