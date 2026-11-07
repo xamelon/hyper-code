@@ -126,7 +126,7 @@ export default function (
     }
 
     // ---- context window ---------------------------------------------------
-    if (status === 413 || /context_length_exceeded|request_too_large|prompt is too long|exceeds the context window|exceeded model token limit/i.test(code + " " + serverMessage + " " + body)) {
+    if (status === 413 || /context_length_exceeded|request_too_large|prompt is too long|exceeds the context window|exceeded model token limit|maximum context length|maximum prompt length/i.test(code + " " + serverMessage + " " + body)) {
         return {
             kind: "overflow",
             provider,

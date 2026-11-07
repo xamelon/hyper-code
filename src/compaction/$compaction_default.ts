@@ -18,7 +18,7 @@ Be concise, structured, and focused on helping the next LLM seamlessly continue 
 
 const SUMMARY_PREFIX = "Another language model started to solve this problem and produced a summary of its thinking process. You also have access to the state of the tools that were used by that language model. Use this to build on the work that has already been done and avoid duplicating work. Here is the summary produced by the other language model, use the information in this summary to assist with your own analysis:";
 
-const OVERFLOW = /context_length_exceeded|request_too_large|prompt is too long|exceeds the context|exceeded model token limit|maximum context length|\b413\b/i;
+const OVERFLOW = /context_length_exceeded|request_too_large|prompt is too long|exceeds the context|exceeded model token limit|maximum context length|maximum prompt length|\b413\b/i;
 
 /**
  * Summarizes a transcript into one handoff message with the agent's own model.
