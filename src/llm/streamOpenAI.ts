@@ -59,7 +59,16 @@ export default async function (
         body: JSON.stringify(body),
         signal: opts.signal,
     } });
-    if (!res.ok) throw new Error(`${ep.provider} ${res.status}: ${await res.text()}`);
+    if (!res.ok) {
+        const raw = await res.text();
+        const error: any = new Error(`${ep.provider} ${res.status}: ${raw}`);
+        // A spent subscription must reach the worker as error.failure to park; anything else stays a plain error.
+        if (ep.kind === "subscription") {
+            const info = ctx.fns.llm.classifyError({ provider: ep.provider, account: ep.account, kind: ep.kind, status: res.status, body: raw, headers: res.headers });
+            if (info.kind === "usage_limit") { error.message = info.message; error.failure = info; }
+        }
+        throw error;
+    }
     if (!res.body) throw new Error("empty response body");
 
     let text = "";

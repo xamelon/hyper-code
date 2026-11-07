@@ -60,8 +60,9 @@ export default function (
     const retryAfterMs = parseRetryAfter(header("retry-after"), now);
 
     // ---- quota exhausted on a subscription -------------------------------
-    const quotaCode = /usage_limit_reached|usage_not_included|quota_exceeded|credits_depleted/i.test(code);
-    const quotaText = /usage limit (?:has been )?reached|out of credits|quota exceeded/i.test(serverMessage || body);
+    // GoUsageLimitError / FreeUsageLimitError: OpenCode's error types; its limit text points at "available balance".
+    const quotaCode = /usage_limit_reached|usage_not_included|quota_exceeded|credits_depleted|GoUsageLimitError|FreeUsageLimitError/i.test(code);
+    const quotaText = /usage limit (?:has been )?reached|out of credits|quota exceeded|available balance/i.test(serverMessage || body);
     // A generic `rate_limit_error` with no quota fields is ordinary throttling,
     // even for subscription credentials. Anthropic can emit it transiently
     // while `/api/oauth/usage` still reports plenty of quota. Park only when

@@ -73,12 +73,31 @@ describe("opencode as a subscription", () => {
         expect((await ctx.fns.llm.listModels({ skipNodes: true })).opencode).toContain("opencode:glm-5.3");
     });
 
-    test("a 429 is not parked as a spent subscription: kind stays api", async () => {
-        const ep: any = await resolveEndpoint(mkCtx(), null, { model: "opencode:glm-5.3" });
-        const body = JSON.stringify({ error: { code: "usage_limit_reached", message: "usage limit reached" } });
-        const reply = (kind: "api" | "subscription") => classifyError({} as Context, null, { provider: "opencode", account: "default", kind, status: 429, body });
-        expect(reply("subscription").kind).toBe("usage_limit");   // what kind: "subscription" would do
-        expect(reply(ep.kind).kind).not.toBe("usage_limit");
+    describe("a failed reply reaches the worker", () => {
+        const failing = async (status: number, body: string) => {
+            const ctx = mkCtx();
+            ctx.fns.llm.classifyError = (opts: any) => classifyError(ctx, null, opts);
+            ctx.fns.llm.connectFetch = async () => new Response(body, { status });
+            return stream(ctx, null, { agent: { id: "a1", model: "opencode:glm-5.3" } as any }).then(() => { throw new Error("expected a failure"); }, (e: any) => e);
+        };
+
+        test("the gateway's named limits park the account", async () => {
+            for (const body of [
+                { error: { type: "GoUsageLimitError", message: "Subscription quota exceeded." } },
+                { type: "error", error: { type: "FreeUsageLimitError", message: "Rate limit exceeded." } },
+                { error: { message: "Monthly usage limit reached. Enable available balance to keep going." } },
+            ]) {
+                const error = await failing(429, JSON.stringify(body));
+                expect(error.failure).toMatchObject({ kind: "usage_limit", provider: "opencode", account: "default", retryable: false });
+            }
+        });
+
+        test("ordinary throttling and other failures do not park", async () => {
+            const throttled = await failing(429, JSON.stringify({ error: { type: "rate_limit_error", message: "slow down" } }));
+            expect(throttled.failure).toBeUndefined();
+            expect(throttled.message).toContain("opencode 429");
+            expect((await failing(500, "boom")).failure).toBeUndefined();
+        });
     });
 });
 
