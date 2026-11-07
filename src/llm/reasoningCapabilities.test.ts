@@ -8,6 +8,13 @@ describe("llm.reasoningCapabilities xAI", () => {
         expect(result.defaultEffort).toBe("medium");
         expect(result.supported).toEqual(["auto", "off", "minimal", "low", "medium", "high", "xhigh"]);
     });
+
+    test("Grok models that refuse a reasoning effort never get one", async () => {
+        for (const model of ["xai:grok-4.20-0309-reasoning", "xai:grok-4.20-0309-non-reasoning", "xai:grok-build-0.1"]) {
+            expect({ model, ...(await capabilities({} as Context, null, { model })) }).toEqual({ model, supported: ["auto", "off"], defaultEffort: "off", mode: "none" });
+        }
+        expect((await capabilities({} as Context, null, { model: "xai:grok-4.7" })).mode).toBe("openai-effort");
+    });
 });
 
 describe("llm.reasoningCapabilities gpt-6", () => {
