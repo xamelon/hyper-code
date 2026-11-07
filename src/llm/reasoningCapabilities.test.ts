@@ -6,7 +6,7 @@ describe("llm.reasoningCapabilities xAI", () => {
         const result = await capabilities({} as Context, null, { model: "xai/work:grok-4.6" });
         expect(result.mode).toBe("openai-effort");
         expect(result.defaultEffort).toBe("medium");
-        expect(result.supported).toEqual(["auto", "off", "minimal", "low", "medium", "high", "xhigh"]);
+        expect(result.supported).toEqual(["auto", "off", "low", "medium", "high", "xhigh"]);
     });
 
     test("Grok models that refuse a reasoning effort never get one", async () => {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import stream from "./streamXai";
 import parseSSE from "./parseSSE";
 import toCodexInput from "./toCodexInput";
+import classifyError from "./classifyError";
 
 function sseResponse(...chunks: string[]): Response {
     const enc = new TextEncoder();
@@ -68,5 +69,30 @@ describe("streamXai", () => {
         globalThis.fetch = (async () => new Response('{"error":"expired"}', { status: 401 })) as any;
         await expect(stream(ctx, null, { agent: agent() })).rejects.toThrow("xai 401");
         expect(marked).toBe(true);
+    });
+
+    describe("failures reach the worker as error.failure", () => {
+        const failing = (reply: () => Response) => {
+            const ctx: any = mkCtx();
+            ctx.fns.llm.classifyError = (opts: any) => classifyError(ctx, null, opts);
+            globalThis.fetch = (async () => reply()) as any;
+            return stream(ctx, null, { agent: agent() }).then(() => { throw new Error("expected a failure"); }, (e: any) => e.failure);
+        };
+
+        test("a spent subscription parks", async () => {
+            const failure = await failing(() => new Response(JSON.stringify({ error: { code: "usage_limit_reached", message: "usage limit reached", resets_in_seconds: 60 } }), { status: 429 }));
+            expect(failure).toMatchObject({ kind: "usage_limit", provider: "xai", account: "default", retryable: false });
+            expect(failure.resetsAt).toBeGreaterThan(Date.now());
+        });
+
+        test("a limit reported inside the stream parks too", async () => {
+            const failure = await failing(() => sseResponse('data: {"type":"response.failed","response":{"error":{"code":"credits_depleted","message":"out of credits"}}}\n\n'));
+            expect(failure).toMatchObject({ kind: "usage_limit", provider: "xai" });
+        });
+
+        test("a bare stream error keeps its message and a transient one stays retryable", async () => {
+            expect((await failing(() => sseResponse('data: {"type":"error","code":"bad","message":"it broke"}\n\n'))).message).toContain("it broke");
+            expect(await failing(() => sseResponse('data: {"type":"error","error":{"message":"service unavailable"}}\n\n'))).toMatchObject({ kind: "transient", retryable: true });
+        });
     });
 });

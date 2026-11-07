@@ -33,8 +33,9 @@ export default async function (
         return { supported: ["auto", "off", "minimal", "low", "medium", "high", ...(xhigh ? ["xhigh" as const] : [])], defaultEffort: "medium", mode: "openai-effort" };
     }
     // grok-4.20 reasons (or not) by model id and answers 400 to any reasoning effort.
+    // The others list low..xhigh in /v1/models; none accepts "minimal".
     if (provider === "xai" && /^grok-4(?:\.(?!20)|$)/.test(modelId)) {
-        return { supported: ["auto", "off", "minimal", "low", "medium", "high", "xhigh"], defaultEffort: "medium", mode: "openai-effort" };
+        return { supported: ["auto", "off", "low", "medium", "high", "xhigh"], defaultEffort: "medium", mode: "openai-effort" };
     }
 
     // Claude 5: adaptive thinking is always on (the API rejects thinking.type "disabled"), only its effort is
