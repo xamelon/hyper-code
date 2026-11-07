@@ -3,7 +3,9 @@ const MIME: Record<string, string> = {
 };
 
 /**
- * Generates or edits marketing images with Nano Banana 2.1 on Vertex AI.
+ * Generates or edits marketing images with Nano Banana 2.1 through the Gemini API or Vertex AI.
+ * A Google AI Studio key in `secret://nanobanana/apiKey` selects the Gemini API (a personal account, no
+ * Cloud project); otherwise the request goes to Vertex AI with the service-account key.
  * Use reference images for product, character, layout, or iterative edits; the
  * generated binary data is written to disk rather than returned through chat.
  */
@@ -20,19 +22,28 @@ export default async function (ctx: Context, _session: Session | null, opts: {
   resolution?: "1K" | "2K" | "4K";
   /** Number of candidate images requested. @default 1 @minimum 1 @maximum 4 */
   count?: number;
-  /** Google Cloud project override. */
+  /** Google Cloud project override; Vertex AI only. */
   project?: string;
-  /** Vertex location. @default "global" */
+  /** Vertex location; Vertex AI only. @default "global" */
   location?: string;
-  /** Vertex model ID. @default "gemini-nano-banana-2.1" */
+  /** Model ID. @default "gemini-nano-banana-2.1" */
   model?: string;
+  /** Which API to call; by default Vertex AI when project or location is given, else the Gemini API when an AI Studio key is stored, else Vertex AI. */
+  backend?: "gemini" | "vertex";
 }): Promise<types.nanobanana.Generation> {
   if (!opts.prompt.trim()) throw new Error("prompt is required");
   if ((opts.images?.length ?? 0) > 14) throw new Error("at most 14 reference images are supported");
   const count = opts.count ?? 1;
   if (!Number.isInteger(count) || count < 1 || count > 4) throw new Error("count must be an integer from 1 to 4");
 
-  const project = await ctx.fns.nanobanana.project({ project: opts.project });
+  // A project or location names a Vertex target, and the bill goes with it: never drop them for a stored key.
+  const vertexTarget = opts.project !== undefined || opts.location !== undefined;
+  if (opts.backend === "gemini" && vertexTarget) throw new Error("nanobanana: project and location apply to Vertex AI only");
+  const wantsGemini = opts.backend === "gemini" || (!opts.backend && !vertexTarget);
+  const apiKey = wantsGemini ? await ctx.fns.secrets.getLocal({ namespace: "nanobanana", name: "apiKey" }) : null;
+  if (opts.backend === "gemini" && !apiKey) throw new Error("nanobanana: Gemini API key is not configured (secret://nanobanana/apiKey)");
+  const backend = apiKey ? "gemini" : "vertex";
+  const project = backend === "vertex" ? await ctx.fns.nanobanana.project({ project: opts.project }) : null;
   const location = opts.location ?? "global";
   const model = opts.model ?? "gemini-nano-banana-2.1";
   const resolution = opts.resolution ?? "1K";
@@ -50,12 +61,20 @@ export default async function (ctx: Context, _session: Session | null, opts: {
   }
   parts.push({ text: opts.prompt });
 
-  const token = await ctx.fns.nanobanana.accessToken({});
-  const host = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`;
-  const url = `https://${host}/v1/projects/${encodeURIComponent(project)}/locations/${encodeURIComponent(location)}/publishers/google/models/${encodeURIComponent(model)}:generateContent`;
+  let url: string;
+  let auth: Record<string, string>;
+  if (backend === "gemini") {
+    url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    auth = { "x-goog-api-key": String(apiKey) };
+  } else {
+    const token = await ctx.fns.nanobanana.accessToken({});
+    const host = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`;
+    url = `https://${host}/v1/projects/${encodeURIComponent(project!)}/locations/${encodeURIComponent(location)}/publishers/google/models/${encodeURIComponent(model)}:generateContent`;
+    auth = { authorization: `Bearer ${token}` };
+  }
   const response = await fetch(url, {
     method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    headers: { ...auth, "content-type": "application/json" },
     body: JSON.stringify({
       contents: [{ role: "user", parts }],
       generationConfig: {
@@ -66,7 +85,8 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     }),
   });
   const json = await response.json() as any;
-  if (!response.ok) throw new Error(`Vertex AI ${response.status}: ${json?.error?.message ?? JSON.stringify(json)}`);
+  const api = backend === "gemini" ? "Gemini API" : "Vertex AI";
+  if (!response.ok) throw new Error(`${api} ${response.status}: ${json?.error?.message ?? JSON.stringify(json)}`);
 
   const requested = ctx.fns.workspace.resolve({ path: opts.out ?? "artifacts/nano-banana.png" });
   const dot = requested.lastIndexOf(".");
@@ -90,6 +110,6 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     await Bun.write(path, Buffer.from(data, "base64"));
     files.push(path);
   }
-  if (!files.length) throw new Error(`Vertex AI returned no image${text.length ? `: ${text.join(" ")}` : ""}`);
-  return { files, model, project, resolution, aspectRatio, text, usage: json.usageMetadata };
+  if (!files.length) throw new Error(`${api} returned no image${text.length ? `: ${text.join(" ")}` : ""}`);
+  return { files, model, backend, project, resolution, aspectRatio, text, usage: json.usageMetadata };
 }

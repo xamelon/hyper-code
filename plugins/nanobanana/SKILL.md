@@ -1,6 +1,6 @@
 # Nano Banana
 
-Generate and edit marketing images with Gemini Nano Banana 2.1 through Vertex AI in the dedicated `hs-hyper-code` Google Cloud project.
+Generate and edit marketing images with Gemini Nano Banana 2.1, through the Gemini API with an AI Studio key or through Vertex AI in the dedicated `hs-hyper-code` Google Cloud project.
 
 ## Use it
 
@@ -22,4 +22,6 @@ Published image-output prices for Nano Banana 2.1 are approximately $0.0336 at 1
 
 ## Authentication
 
-Uses only a dedicated service-account JSON key stored in encrypted local secret storage as `secret://nanobanana/serviceAccountKey` — never the ambient `gcloud`/ADC identity. Give that service account nothing but `aiplatform.endpoints.predict` in the billed project (in `hs-hyper-code`: custom role `nanobananaPredict`, account `nanobanana-marketing@hs-hyper-code.iam.gserviceaccount.com`). Store the key with `secrets.set({ ref: "secret://nanobanana/serviceAccountKey", value })` or a `secret` chat input; the plugin mints short-lived tokens from it and caches them in memory. The project is intentionally fixed to `hs-hyper-code` unless explicitly overridden.
+A Google AI Studio key stored with `secrets.set({ ref: "secret://nanobanana/apiKey", value })` selects the Gemini API, billed to that key's account. Passing `project` or `location`, or `backend: "vertex"`, goes to Vertex AI even when a key is stored; `backend: "gemini"` fails if there is no key. The result's `backend` says which API served the request, and `project` is null on the Gemini API.
+
+Vertex AI uses only a dedicated service-account JSON key stored in encrypted local secret storage as `secret://nanobanana/serviceAccountKey` — never the ambient `gcloud`/ADC identity. Give that service account nothing but `aiplatform.endpoints.predict` in the billed project (in `hs-hyper-code`: custom role `nanobananaPredict`, account `nanobanana-marketing@hs-hyper-code.iam.gserviceaccount.com`). Store the key with `secrets.set({ ref: "secret://nanobanana/serviceAccountKey", value })` or a `secret` chat input; the plugin mints short-lived tokens from it and caches them in memory. The project is intentionally fixed to `hs-hyper-code` unless explicitly overridden.
