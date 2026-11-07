@@ -34,6 +34,18 @@ describe("agent.setModel", () => {
         await expect(ctx.fns.agent.setModel({ id: a.id, model: "nosuch:model" })).rejects.toThrow(/unknown provider/);
     });
 
+    test("xai: a stored OAuth login counts as the credential, a missing one fails", async () => {
+        const ctx: any = await mkTestCtx();
+        const a = await ctx.fns.agent.start({ model: "mock:test" });
+        await expect(ctx.fns.agent.setModel({ id: a.id, model: "xai/personal:grok-4.7" })).rejects.toThrow(/no credential for xai\/personal/);
+        await ctx.fns.procs.db.run({
+            sql: "INSERT INTO oauth_credentials (provider, account, access_enc, refresh_enc, expires_at, created_at, updated_at) VALUES ('xai-oauth', 'personal', 'x', 'x', ?, ?, ?)",
+            params: [Date.now() + 3_600_000, Date.now(), Date.now()],
+        });
+        const result = await ctx.fns.agent.setModel({ id: a.id, model: "xai/personal:grok-4.7" });
+        expect(result).toMatchObject({ changed: [a.id], model: "xai/personal:grok-4.7" });
+    });
+
     test("switching model lifts the parking and resumes the unanswered work", async () => {
         const ctx: any = await mkTestCtx();
         const a = await ctx.fns.agent.start({ model: "mock:test" });

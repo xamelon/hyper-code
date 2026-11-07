@@ -36,7 +36,13 @@ export default async function (
 
     // Fail here, loudly, instead of on the agent's next turn.
     const endpoint = await ctx.fns.llm.resolveEndpoint({ model });
-    if (!endpoint.apiKey && endpoint.kind !== "local" && endpoint.provider !== "claude-code" && endpoint.provider !== "anthropic-oauth") {
+    // xAI keeps its OAuth token out of resolveEndpoint (streamXai fetches and
+    // refreshes it per call), so the credential check is a stored login.
+    const xaiConnected = endpoint.provider === "xai" && ((await ctx.fns.procs.db.select({
+        sql: "SELECT 1 FROM oauth_credentials WHERE provider = 'xai-oauth' AND account = ?",
+        params: [endpoint.account],
+    })) as any[]).length > 0;
+    if (!endpoint.apiKey && !xaiConnected && endpoint.kind !== "local" && endpoint.provider !== "claude-code" && endpoint.provider !== "anthropic-oauth") {
         throw new Error(`setModel: no credential for ${endpoint.provider}/${endpoint.account} — add a key or log in first`);
     }
 
