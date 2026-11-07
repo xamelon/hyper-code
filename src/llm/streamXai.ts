@@ -33,8 +33,7 @@ export default async function (
     if (!res.ok) {
       if (res.status === 401) await ctx.fns.llm.accountAuthHealth({ action: "mark", provider: ep.provider, account: ep.account });
       const raw = await res.text();
-      const info = ctx.fns.llm.classifyError({ provider: ep.provider, account: ep.account, kind: ep.kind, status: res.status, body: raw, headers: res.headers });
-      const err: any = new Error(info.message); Object.assign(err, info); throw err;
+      throw classified(ctx.fns.llm.classifyError({ provider: ep.provider, account: ep.account, kind: ep.kind, status: res.status, body: raw, headers: res.headers }));
     }
     await ctx.fns.llm.accountAuthHealth({ action: "clear", provider: ep.provider, account: ep.account });
     if (!res.body) throw new Error("xai: empty response body");
@@ -50,10 +49,13 @@ export default async function (
       else if (t === "response.function_call_arguments.delta" && typeof ev.delta === "string") opts.onEvent?.({ type: "tool_args_delta", delta: ev.delta, id: ev.item_id });
       else if (t === "response.output_item.done" && ev.item?.type === "function_call") toolCalls.push({ id: ev.item.call_id ?? ev.item.id, name: ev.item.name, args: parseArgs(ev.item.arguments) });
       else if (t === "response.completed" || t === "response.incomplete") { const u = ev.response?.usage; if (u) { usage.prompt_tokens = u.input_tokens ?? 0; usage.completion_tokens = u.output_tokens ?? 0; (usage as any).cache_read_tokens = u.input_tokens_details?.cached_tokens ?? 0; } finishReason = t === "response.incomplete" ? (ev.response?.incomplete_details?.reason === "max_output_tokens" ? "length" : "incomplete") : "stop"; }
-      else if (t === "response.failed" || t === "error") throw new Error(`xai ${t}: ${ev.response?.error?.message ?? ev.error?.message ?? ev.message ?? ev.code ?? "unknown error"}`);
+      // A limit can also arrive inside a 200 stream: classify it the same way, or the agent never parks.
+      else if (t === "response.failed" || t === "error") throw classified(ctx.fns.llm.classifyError({ provider: ep.provider, account: ep.account, kind: ep.kind, body: JSON.stringify({ error: ev.response?.error ?? ev.error ?? { code: ev.code, message: ev.message ?? "unknown error" } }) }));
     }
     ctx.fns.llm.refreshUsage?.({ provider: ep.provider, account: ep.account, maxAgeMs: 60_000 })?.catch(() => undefined);
 
     return { text, thinking, finishReason, usage, toolCalls };
+    // agent.workerLoop reads error.failure to choose between parking, retrying and giving up.
+    function classified(info: types.llm.FailureInfo): Error { const err: any = new Error(info.message); err.failure = info; return err; }
     function parseArgs(raw: unknown): any { const value = typeof raw === "string" ? raw : ""; if (!value.trim()) return {}; try { return JSON.parse(value); } catch { return { __unparsed: value }; } }
 }

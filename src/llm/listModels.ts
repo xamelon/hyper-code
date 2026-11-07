@@ -159,6 +159,8 @@ const CLAUDE_MODELS = [
     "claude-fable-5-1",
 ];
 
+const GROK_MODELS = ["grok-4.7", "grok-4.6", "grok-4.5", "grok-4.3"];
+
 /**
  * How each subscription provider's models are found for one account: model ids without the route prefix.
  * Live catalogues ask the provider with that account's own credential (the whitelist is plan-gated, so two
@@ -187,6 +189,24 @@ const SUBSCRIPTIONS: Record<string, (ctx: Context, a: Account) => Promise<string
     "kimi-coding": async (ctx, a) => a.needsReconnect ? [] : (await ctx.fns.llm.kimiCodingModels({ account: a.account })).map(id => id.slice(id.indexOf(":") + 1)),
     "claude-code": async () => CLAUDE_MODELS,
     "anthropic-oauth": async () => CLAUDE_MODELS,
-    // SuperGrok / X Premium via xAI device OAuth: the current Grok Responses models.
-    xai: async () => ["grok-4.6", "grok-4.5", "grok-4.3"],
+    // SuperGrok / X Premium via xAI device OAuth, newest first. Multi-agent models refuse client-side tools
+    // without beta access, so an agent could not run on them. A failed lookup falls back to the known models,
+    // which also keeps an account needing a reconnect visible.
+    xai: async (ctx, a) => {
+        if (a.needsReconnect) return GROK_MODELS;
+        try {
+            const tok = await ctx.fns.llm.getXaiOAuthToken({ account: a.account });
+            const r = await fetch("https://api.x.ai/v1/language-models", {
+                headers: { "authorization": `Bearer ${tok}` },
+                signal: AbortSignal.timeout(3000),
+            });
+            if (!r.ok) return GROK_MODELS;
+            const j: any = await r.json();
+            const ids = (j.models ?? [])
+                .filter((m: any) => !String(m.id).includes("multi-agent") && (m.output_modalities ?? ["text"]).includes("text"))
+                .sort((x: any, y: any) => Number(y.created ?? 0) - Number(x.created ?? 0))
+                .map((m: any) => String(m.id));
+            return ids.length ? ids : GROK_MODELS;
+        } catch { return GROK_MODELS; }
+    },
 };

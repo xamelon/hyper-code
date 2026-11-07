@@ -49,9 +49,47 @@ describe("llm.listModels", () => {
         expect(groups["anthropic-oauth"]).toContain("anthropic-oauth/expired:claude-opus-5-5");
     });
 
-    test("connected xAI subscription exposes Grok Responses models", async () => {
-        const groups = await listModels(offline([account("xai", "default")]), null);
-        expect(groups.xai).toEqual(["xai:grok-4.6", "xai:grok-4.5", "xai:grok-4.3"]);
+    describe("Grok catalogue", () => {
+        const known = ["grok-4.7", "grok-4.6", "grok-4.5", "grok-4.3"];
+        const withReply = async (reply: (auth: string) => Response, accounts = [account("xai", "work")]) => {
+            const realFetch = globalThis.fetch;
+            const seen: string[] = [];
+            globalThis.fetch = (async (input: any, init?: any) => {
+                if (String(input?.url ?? input) !== "https://api.x.ai/v1/language-models") return realFetch(input, init);
+                const auth = String(new Headers(init?.headers).get("authorization"));
+                seen.push(auth);
+                return reply(auth);
+            }) as typeof fetch;
+            try {
+                const groups = await listModels(offline(accounts, { getXaiOAuthToken: async ({ account }: { account: string }) => `${account}-token` }), null);
+                return { seen, ids: groups.xai };
+            } finally { globalThis.fetch = realFetch; }
+        };
+
+        test("comes from xAI with the account's own token, newest first, without multi-agent models", async () => {
+            const { seen, ids } = await withReply(() => Response.json({ models: [
+                { id: "grok-4.3", created: 2, output_modalities: ["text"] },
+                { id: "grok-4.20-multi-agent-0309", created: 1, output_modalities: ["text"] },
+                { id: "grok-4.7", created: 4, output_modalities: ["text"] },
+                { id: "grok-painter", created: 5, output_modalities: ["image"] },
+                { id: "grok-build-0.1", created: 3, output_modalities: ["text"] },
+            ] }));
+            expect(seen).toEqual(["Bearer work-token"]);
+            expect(ids).toEqual(["xai/work:grok-4.7", "xai/work:grok-build-0.1", "xai/work:grok-4.3"]);
+        });
+
+        test("falls back to the known models when xAI cannot answer", async () => {
+            const fallback = known.map(id => `xai/work:${id}`);
+            expect((await withReply(() => new Response("no", { status: 500 }))).ids).toEqual(fallback);
+            expect((await withReply(() => Response.json({ models: [] }))).ids).toEqual(fallback);
+            expect((await withReply(() => new Response("not json"))).ids).toEqual(fallback);
+        });
+
+        test("an account needing a reconnect stays visible and is not asked", async () => {
+            const { seen, ids } = await withReply(() => new Response("no", { status: 401 }), [account("xai", "work", true)]);
+            expect(seen).toEqual([]);
+            expect(ids).toEqual(known.map(id => `xai/work:${id}`));
+        });
     });
 
     test("a named login without a default one shows like any other: Claude Code and Kimi", async () => {
