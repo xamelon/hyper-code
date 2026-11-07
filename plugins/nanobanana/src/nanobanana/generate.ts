@@ -28,7 +28,7 @@ export default async function (ctx: Context, _session: Session | null, opts: {
   location?: string;
   /** Model ID. @default "gemini-nano-banana-2.1" */
   model?: string;
-  /** Which API to call; by default the Gemini API when an AI Studio key is stored, else Vertex AI. */
+  /** Which API to call; by default Vertex AI when project or location is given, else the Gemini API when an AI Studio key is stored, else Vertex AI. */
   backend?: "gemini" | "vertex";
 }): Promise<types.nanobanana.Generation> {
   if (!opts.prompt.trim()) throw new Error("prompt is required");
@@ -36,7 +36,11 @@ export default async function (ctx: Context, _session: Session | null, opts: {
   const count = opts.count ?? 1;
   if (!Number.isInteger(count) || count < 1 || count > 4) throw new Error("count must be an integer from 1 to 4");
 
-  const apiKey = opts.backend === "vertex" ? null : await ctx.fns.secrets.getLocal({ namespace: "nanobanana", name: "apiKey" });
+  // A project or location names a Vertex target, and the bill goes with it: never drop them for a stored key.
+  const vertexTarget = opts.project !== undefined || opts.location !== undefined;
+  if (opts.backend === "gemini" && vertexTarget) throw new Error("nanobanana: project and location apply to Vertex AI only");
+  const wantsGemini = opts.backend === "gemini" || (!opts.backend && !vertexTarget);
+  const apiKey = wantsGemini ? await ctx.fns.secrets.getLocal({ namespace: "nanobanana", name: "apiKey" }) : null;
   if (opts.backend === "gemini" && !apiKey) throw new Error("nanobanana: Gemini API key is not configured (secret://nanobanana/apiKey)");
   const backend = apiKey ? "gemini" : "vertex";
   const project = backend === "vertex" ? await ctx.fns.nanobanana.project({ project: opts.project }) : null;
@@ -107,5 +111,5 @@ export default async function (ctx: Context, _session: Session | null, opts: {
     files.push(path);
   }
   if (!files.length) throw new Error(`${api} returned no image${text.length ? `: ${text.join(" ")}` : ""}`);
-  return { files, model, project: project ?? "gemini-api", resolution, aspectRatio, text, usage: json.usageMetadata };
+  return { files, model, backend, project, resolution, aspectRatio, text, usage: json.usageMetadata };
 }
